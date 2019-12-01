@@ -1,0 +1,7 @@
+# Ignore all, unignore all files with extension and all directories
+*
+!*.*
+!*/
+
+*.swp
+
