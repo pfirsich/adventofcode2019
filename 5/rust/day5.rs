@@ -55,6 +55,10 @@ enum OpCode {
     Mul,
     Input,
     Output,
+    JumpIfTrue,
+    JumpIfFalse,
+    LessThan,
+    Equals,
     Terminate
 }
 
@@ -80,6 +84,14 @@ impl Operation {
                              parameters: vec![ParamType::Read, ParamType::Read, ParamType::Write] },
             3 => Operation { op_code: OpCode::Input, parameters: vec![ParamType::Write] },
             4 => Operation { op_code: OpCode::Output, parameters: vec![ParamType::Read] },
+            5 => Operation { op_code: OpCode::JumpIfTrue, 
+                             parameters: vec![ParamType::Read, ParamType::Read] },
+            6 => Operation { op_code: OpCode::JumpIfFalse, 
+                             parameters: vec![ParamType::Read, ParamType::Read] },
+            7 => Operation { op_code: OpCode::LessThan,
+                             parameters: vec![ParamType::Read, ParamType::Read, ParamType::Write] },
+            8 => Operation { op_code: OpCode::Equals,
+                             parameters: vec![ParamType::Read, ParamType::Read, ParamType::Write] },
             99 => Operation { op_code: OpCode::Terminate, parameters: vec![] },
             _ => panic!("Unknown opcode: {}", instruction)
         }
@@ -109,30 +121,52 @@ impl Operation {
     }
 
     fn execute<I: InputSource, O: OutputSink>(&self, memory: &mut Vec<i64>, ip: usize, input_source: &mut I, output_sink: &mut O) -> Option<usize> {
+        let param = |param_num: usize| self.get_param_address(&memory, ip, param_num);
+        let validate_addr = |value: i64| {
+            if value < 0 {
+                panic!("Cannot jump to negative address");
+            }
+            return value as usize;
+        };
         match self.op_code {
             OpCode::Add => {
-                let addr = self.get_param_address(&memory, ip, 3);
-                memory[addr] = memory[self.get_param_address(&memory, ip, 1)] 
-                    + memory[self.get_param_address(&memory, ip, 2)];
-                return Some(ip + 4);
+                let addr = param(3);
+                memory[addr] = memory[param(1)] + memory[param(2)];
             },
             OpCode::Mul => {
-                let addr = self.get_param_address(&memory, ip, 3);
-                memory[addr] = memory[self.get_param_address(&memory, ip, 1)] 
-                    * memory[self.get_param_address(&memory, ip, 2)];
-                return Some(ip + 4);
+                let addr = param(3);
+                memory[addr] = memory[param(1)] * memory[param(2)];
             },
             OpCode::Input => {
-                let addr = self.get_param_address(&memory, ip, 1);
+                let addr = param(1);
                 memory[addr] = input_source.read();
-                return Some(ip + 2);
             },
             OpCode::Output => {
-                output_sink.write(memory[self.get_param_address(&memory, ip, 1)]);
-                return Some(ip + 2);
+                output_sink.write(memory[param(1)]);
+            },
+            OpCode::JumpIfTrue => {
+                let addr = param(1); 
+                if memory[addr] != 0 {
+                    return Some(validate_addr(memory[param(2)]));
+                }
+            },
+            OpCode::JumpIfFalse => {
+                let addr = param(1);
+                if memory[addr] == 0 {
+                    return Some(validate_addr(memory[param(2)]));
+                }
+            },
+            OpCode::LessThan => {
+                let addr = param(3);
+                memory[addr] = if memory[param(1)] < memory[param(2)] { 1 } else { 0 }
             }
-            OpCode::Terminate => None,
+            OpCode::Equals => {
+                let addr = param(3);
+                memory[addr] = if memory[param(1)] == memory[param(2)] { 1 } else { 0 }
+            }
+            OpCode::Terminate => return None,
         }
+        return Some(ip + 1 + self.parameters.len());
     }
 }
 
@@ -161,7 +195,7 @@ fn run_vm<I: InputSource, O: OutputSink>(program: &Vec<i64>, input_source: &mut 
 
 fn main() {
     let program = read_program("../input");
-    let mut input: VecDeque<i64> = VecDeque::from(vec![1]);
+    let mut input: VecDeque<i64> = VecDeque::from(vec![5]);
     let mut output = ConsoleOutputSink {};
     run_vm(&program, &mut input, &mut output);
 }
