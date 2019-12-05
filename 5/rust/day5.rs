@@ -167,17 +167,18 @@ fn run_vm<I: InputSource, O: OutputSink>(program: &Vec<i64>, input_source: &mut 
         }
         match opcode {
             OpCode::ADD => {
-                memory[get_param_address(&mut memory, ip, 3)] =
-                    memory[get_param_address(&memory, ip, 1)] 
-                    + memory[get_param_address(&memory, ip, 2)];
+                let addr = get_param_address(&memory, ip, 3);
+                memory[addr] =
+                    memory[get_param_address(&memory, ip, 1)] + memory[get_param_address(&memory, ip, 2)]; 
             },
             OpCode::MUL => {
-                memory[get_param_address(&mut memory, ip, 3)] =
-                    memory[get_param_address(&memory, ip, 1)] 
-                    * memory[get_param_address(&memory, ip, 2)] 
+                let addr = get_param_address(&memory, ip, 3);
+                memory[addr] =
+                    memory[get_param_address(&memory, ip, 1)] * memory[get_param_address(&memory, ip, 2)]; 
             },
             OpCode::INPUT => {
-                memory[get_param_address(&mut memory, ip, 1)] = input_source.read();
+                let addr = get_param_address(&memory, ip, 1);
+                memory[addr] = input_source.read();
             },
             OpCode::OUTPUT => {
                 output_sink.write(memory[get_param_address(&memory, ip, 1)]);
