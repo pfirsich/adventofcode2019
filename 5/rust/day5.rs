@@ -42,6 +42,7 @@ fn read_program(filename: &str) -> Vec<i64> {
     return program_str.split(",").map(parse_int).collect::<Vec<i64>>();
 }
 
+#[derive(PartialEq)]
 enum ParamMode {
     POSITION,
     IMMEDIATE
@@ -49,7 +50,7 @@ enum ParamMode {
 
 impl ParamMode {
     fn read(instruction: i64, param_num: usize) -> ParamMode {
-        let digit_base = 10i64.pow(param_num as usize + 1);
+        let digit_base = 10i64.pow(param_num as u32 + 1);
         return match (instruction / digit_base) % 10 {
             0 => ParamMode::POSITION,
             1 => ParamMode::IMMEDIATE,
@@ -66,6 +67,7 @@ enum OpCode {
     TERMINATE = 99,
 }
 
+#[derive(PartialEq)]
 enum ParamType {
     READ,
     WRITE
@@ -85,87 +87,67 @@ impl OpCode {
 
     fn get_param_count(&self) -> usize {
         match self {
-            ADD => 3,
-            MUL => 3,
-            INPUT => 1,
-            OUTPUT => 1,
-            TERMINATE => 0,
+            OpCode::ADD => 3,
+            OpCode::MUL => 3,
+            OpCode::INPUT => 1,
+            OpCode::OUTPUT => 1,
+            OpCode::TERMINATE => 0,
         }
     }
 
     fn get_param_type(&self, param_num: usize) -> ParamType {
         return match self {
-            ADD => {
-                return match param_num {
+            OpCode::ADD => {
+                match param_num {
                     1 => ParamType::READ,
                     2 => ParamType::READ,
                     3 => ParamType::WRITE, 
                     _ => panic!("ADD does not have a parameter {}", param_num)
                 }
             },
-            MUL => {
-                return match param_num {
+            OpCode::MUL => {
+                match param_num {
                     1 => ParamType::READ,
                     2 => ParamType::READ,
                     3 => ParamType::WRITE,
                     _ => panic!("MUL does not have a parameter {}", param_num)
                 }
             },
-            INPUT => {
-                return match param_num {
+            OpCode::INPUT => {
+                match param_num {
                     1 => ParamType::WRITE,
                     _ => panic!("INPUT does not have a parameter {}", param_num)
                 }
             },
-            OUTPUT => {
-                return match param_num {
+            OpCode::OUTPUT => {
+                match param_num {
                     1 => ParamType::READ,
                     _ => panic!("OUTPUT does not have a parameter {}", param_num)
                 }
             },
-            TERMINATE => {
+            OpCode::TERMINATE => {
                 panic!("TERMINATE does not have parameters!");
             }
         }
     }
 }
 
-fn read_param(memory: &Vec<i64>, instruction_pointer: usize, param_num: usize) -> i64 {
-    let param_pointer = instruction_pointer + param_num;
-    if param_pointer >= memory.len() {
-        panic!("Cannot read parameter {} for instruction {} at {}. Out of bounds.", param_num, memory[instruction_pointer], instruction_pointer);
-    }
-    let mode = ParamMode::read(memory[instruction_pointer], param_num);
-    return match mode {
-        POSITION => {
-            let address = memory[param_pointer];
-            if address >= memory.len() {
-                panic!("Cannot read address pointed to by parameter: {}. Out of bounds.", address);
-            }
-            return memory[address as usize];
-        }
-        IMMEDIATE => {
-            return memory[param_pointer];
-        }
-    }
-}
-
-fn write_param(memory: &mut Vec<i64>, instruction_pointer: usize, param_num: usize, value: i64) {
+fn get_param_address(memory: &Vec<i64>, instruction_pointer: usize, param_num: usize) -> usize {
     let param_pointer = instruction_pointer + param_num;
     if param_pointer >= memory.len() {
         panic!("Cannot read parameter {} for instruction {} at {}. Out of bounds.", param_num, memory[instruction_pointer], instruction_pointer);
     }
     let mode = ParamMode::read(memory[instruction_pointer], param_num);
     match mode {
-        POSITION => {
+        ParamMode::POSITION => {
             let address = memory[param_pointer];
-            if address >= memory.len() {
-                panic!("Cannot write to address pointed to by parameter: {}. Out of bounds.", address);
+            if address < 0 || address as usize > memory.len() {
+                panic!("Cannot read address pointed to by parameter: {}. Out of bounds.", address);
             }
-            memory[address] = value;
-        },
-        IMMEDIATE => {
-            memory[param_pointer] = value;
+            return address as usize;
+        }
+        ParamMode::IMMEDIATE => {
+            return param_pointer;
         }
     }
 }
@@ -184,26 +166,31 @@ fn run_vm<I: InputSource, O: OutputSink>(program: &Vec<i64>, input_source: &mut 
             }
         }
         match opcode {
-            ADD => {
-                write_param(&mut memory, ip, 3, read_param(&memory, ip, 1) + read_param(&memory, ip, 2));
+            OpCode::ADD => {
+                memory[get_param_address(&mut memory, ip, 3)] =
+                    memory[get_param_address(&memory, ip, 1)] 
+                    + memory[get_param_address(&memory, ip, 2)];
             },
-            MUL => {
-                write_param(&mut memory, ip, 3, read_param(&memory, ip, 1) * read_param(&memory, ip, 2));
+            OpCode::MUL => {
+                memory[get_param_address(&mut memory, ip, 3)] =
+                    memory[get_param_address(&memory, ip, 1)] 
+                    * memory[get_param_address(&memory, ip, 2)] 
             },
-            INPUT => {
-                write_param(&mut memory, ip, 1, input_source.read());
+            OpCode::INPUT => {
+                memory[get_param_address(&mut memory, ip, 1)] = input_source.read();
             },
-            OUTPUT => {
-                output_sink.write(read_param(&memory, ip, 1));
+            OpCode::OUTPUT => {
+                output_sink.write(memory[get_param_address(&memory, ip, 1)]);
             }
-            TERMINATE => break,
+            OpCode::TERMINATE => break,
         }
+        ip += opcode.get_param_count() + 1;
     }
 }
 
 fn main() {
     let program = read_program("../input");
-    let mut input = VecDeque::from_iter(&[1]);
+    let mut input: VecDeque<i64> = VecDeque::from(vec![1]);
     //let mut output: Vec<i64> = Vec::new();
     let mut output = ConsoleOutputSink {};
     run_vm(&program, &mut input, &mut output);
