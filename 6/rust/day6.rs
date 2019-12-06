@@ -30,23 +30,25 @@ fn get_orbit_chain(orbits: &HashMap<String, String>, object: &String) -> Vec<Str
     return chain;
 }
 
-fn get_first_common_object(objectA: &String, objectB: &String) -> String {
-    let chainA = get_orbit_chain(orbits, objectA);
-    let chainB = get_orbit_chain(orbits, objectB);
-    for (i, object) in chainA.iter().enumerate() {
-        match chainB.iter().position(|&x| x == object) {
-            Some(common) => return ,
+fn get_first_common_object(chain_a: &Vec<String>, chain_b: &Vec<String>) -> Option<(usize, usize)> {
+    for (i, object) in chain_a.iter().enumerate() {
+        match chain_b.iter().position(|x| x == object) {
+            Some(j) => return Some((i, j)),
             None => ()
         }
     }
+    return None;
 }
 
 fn main() {
-	let orbits = read_orbit_map("../input");
-	let mut count = 0;
-	for (object, _) in &orbits {
+    let orbits = read_orbit_map("../input");
+    let mut count = 0;
+    for (object, _) in &orbits {
         count += get_orbit_chain(&orbits, &object).len();
-	}
-    let common = get_first_common_object(&orbits, "YOU", "SAN");
-	println!("Total orbits: {}", count);
+    }
+    let you_chain = get_orbit_chain(&orbits, &String::from("YOU"));
+    let santa_chain = get_orbit_chain(&orbits, &String::from("SAN"));
+    let (i, j) = get_first_common_object(&you_chain, &santa_chain).unwrap();
+    println!("Distance: {}", i + j);
+    println!("Total orbits: {}", count);
 }
