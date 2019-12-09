@@ -342,4 +342,8 @@ fn main() {
     let mut vm: Vm<VecDeque<i64>, ConsoleOutputSink> = Vm::new(program.clone());
     vm.input_source.push_back(1);
     vm.run();
+
+    vm = Vm::new(program.clone());
+    vm.input_source.push_back(2);
+    vm.run();
 }
