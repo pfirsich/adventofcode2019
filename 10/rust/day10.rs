@@ -111,7 +111,7 @@ fn print_map(map: &BoolGrid, true_str: &str, false_str: &str) {
 }
 
 fn main() {
-    let map = load_asteroid_map("../input");
+    let map = load_asteroid_map("../input_test5");
     let mut max_vis = 0;
     let mut max_vis_x = 0;
     let mut max_vis_y = 0;
@@ -122,7 +122,7 @@ fn main() {
                 //print_map(&vis_map, " ", "X");
                 let visible_count = count_visible_asteroids(&map, &vis_map);
                 if visible_count > max_vis {
-                    max_vis = visible_count;
+                    max_vis = visible_count - 1; // -1 for OTHER asteroids
                     max_vis_x = x;
                     max_vis_y = y;
                 }
