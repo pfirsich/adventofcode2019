@@ -342,16 +342,24 @@ enum Direction {
     Up, Down, Left, Right
 }
 
-fn simulate_robot(program: &Vec<i64>) -> usize {
+fn pos_hash(x: i64, y: i64) -> i64 {
+    return (x << 30) | y;
+}
+
+fn hash_to_pos(hash: i64) -> (i64, i64) {
+    return (hash >> 30, hash & 0x3fffffff);
+}
+
+fn simulate_robot(program: &Vec<i64>, start_color: i64) -> HashMap<i64, i64> {
     let mut panel_map: HashMap<i64, i64> = HashMap::new(); // position hash -> color
     let mut cur_x = 0;
     let mut cur_y = 0;
     let mut dir = Direction::Up;
     let mut brain: Vm<VecDeque<i64>, VecDeque<i64>> = Vm::new(program.clone());
+    panel_map.insert(0, start_color);
     loop {
-        let pos_hash = cur_x * 0x10000000 + cur_y;
+        let pos_hash = pos_hash(cur_x, cur_y);
         let color = *panel_map.get(&pos_hash).unwrap_or(&0); // default is black
-        println!("Color under {}, {}: {}", cur_x, cur_y, color);
         brain.input_source.push_back(color);
         match brain.run() {
             VmState::Terminated => break,
@@ -361,7 +369,6 @@ fn simulate_robot(program: &Vec<i64>) -> usize {
         assert!(brain.output_sink.len() == 2, "Output sink: {:?}", brain.output_sink);
         let new_color = brain.output_sink.pop_front().unwrap();
         let turn_dir = brain.output_sink.pop_front().unwrap();
-        println!("New color: {}, turn: {}", new_color, turn_dir);
 
         *panel_map.entry(pos_hash).or_insert(new_color) = new_color;
         
@@ -389,10 +396,51 @@ fn simulate_robot(program: &Vec<i64>) -> usize {
             Direction::Right => cur_x += 1,
         }
     }
-    return panel_map.len();
+    return panel_map;
 }
 
 fn main() {
     let program = read_program("../input");
-    println!("Colored panels: {}", simulate_robot(&program));
+
+    let panels = simulate_robot(&program, 0);
+    println!("{} panels painted!", panels.len());
+
+    let mut min_x = 0;
+    let mut max_x = 0;
+    let mut min_y = 0;
+    let mut max_y = 0;
+    for (pos_hash, _color) in panels.iter() {
+        let (x, y) = hash_to_pos(*pos_hash);
+        min_x = std::cmp::min(x, min_x);
+        min_y = std::cmp::min(y, min_y);
+        max_x = std::cmp::max(x, max_x);
+        max_y = std::cmp::max(y, max_y);
+    }
+    let range_y = (max_y - min_y + 1) as usize;
+    let range_x = (max_x - min_x + 1) as usize;
+    println!("min_x: {}, range_x: {}", min_x, range_x);
+    println!("min_y: {}, range_y: {}", min_y, range_y);
+    
+    let mut ship: Vec<Vec<i64>> = Vec::new();
+    ship.resize(range_y, Vec::new());
+    for y in 0..range_y {
+        ship[y].resize(range_x, 0);
+    }
+
+    for (pos_hash, color) in panels.iter() {
+        let (x, y) = hash_to_pos(*pos_hash);
+        let rx = (x + min_x) as usize;
+        let ry = (y + min_y) as usize;
+        ship[ry][rx] = *color;
+    }
+    for y in 0..ship.len() {
+        for x in 0..ship[y].len() {
+            print!("{}", match ship[y][x] {
+                0 => " ",
+                1 => "X",
+                _ => panic!("Unknown color: {}", ship[y][x])
+            })
+        }
+        println!("");
+    }
 }
