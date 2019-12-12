@@ -69,7 +69,7 @@ struct Body {
 
 impl Body {
     fn energy(&self) -> u64 {
-        return self.position.one_norm() + self.velocity.one_norm();
+        return self.position.one_norm() * self.velocity.one_norm();
     }
 }
 
@@ -104,7 +104,19 @@ fn main() {
         Body { position: Vector { x: 0, y: -6, z: 0 }, velocity: Vector::default() },
         Body { position: Vector { x: 5, y: 9, z: 6 }, velocity: Vector::default() },
     ];
+    /*let mut moons: Vec<Body> = vec![
+        Body { position: Vector { x: -1, y: 0, z: 2 }, velocity: Vector::default() },
+        Body { position: Vector { x: 2, y: -10, z: -7 }, velocity: Vector::default() },
+        Body { position: Vector { x: 4, y: -8, z: 8 }, velocity: Vector::default() },
+        Body { position: Vector { x: 3, y: 5, z: -1 }, velocity: Vector::default() },
+    ];*/
     for _step in 0..1000 {
+        /*for moon in &moons {
+            println!("pos=<x={}, y={}, z={}>, vel=<x={}, y={}, z={}>", 
+                moon.position.x, moon.position.y, moon.position.z, 
+                moon.velocity.x, moon.velocity.y, moon.velocity.z);
+        }
+        println!("");*/
         let new_state = step(&moons);
         moons = new_state;
     }
