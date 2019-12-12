@@ -338,29 +338,50 @@ fn read_program(filename: &str) -> Vec<i64> {
     return program_str.split(",").map(parse_int).collect::<Vec<i64>>();
 }
 
+#[derive(Clone, Copy)]
+struct Position {
+    x: i64,
+    y: i64
+}
+
+struct Panel {
+    position: Position,
+    color: i64,
+}
+
 enum Direction {
     Up, Down, Left, Right
 }
 
-fn pos_hash(x: i64, y: i64) -> i64 {
-    return (x << 30) | y;
+fn pos_hash(pos: &Position) -> i64 {
+    return pos.x * 0x1000000 + pos.y;
 }
 
 fn hash_to_pos(hash: i64) -> (i64, i64) {
-    return (hash >> 30, hash & 0x3fffffff);
+    let x = hash / 0x1000000;
+    return (x, hash - x);
 }
 
-fn simulate_robot(program: &Vec<i64>, start_color: i64) -> HashMap<i64, i64> {
-    let mut panel_map: HashMap<i64, i64> = HashMap::new(); // position hash -> color
-    let mut cur_x = 0;
-    let mut cur_y = 0;
+fn simulate_robot(program: &Vec<i64>, start_color: i64) -> Vec<Panel> {
+    let mut panels: Vec<Panel> = Vec::new();
+    let mut panel_map: HashMap<i64, usize> = HashMap::new(); // position hash -> panel index
+    let mut cur = Position { x: 0, y: 0 };
     let mut dir = Direction::Up;
     let mut brain: Vm<VecDeque<i64>, VecDeque<i64>> = Vm::new(program.clone());
-    panel_map.insert(0, start_color);
+    panels.push(Panel { position: cur, color: start_color });
+    panel_map.insert(pos_hash(&cur), 0);
     loop {
-        let pos_hash = pos_hash(cur_x, cur_y);
-        let color = *panel_map.get(&pos_hash).unwrap_or(&0); // default is black
-        brain.input_source.push_back(color);
+        let pos_hash = pos_hash(&cur);
+        let mut panel = match panel_map.get(&pos_hash) {
+            Some(idx) => &mut panels[*idx],
+            None => {
+                panels.push(Panel { position: cur, color: 0 });
+                let idx = panels.len() - 1;
+                panel_map.insert(pos_hash, idx);
+                &mut panels[idx]
+            }
+        };
+        brain.input_source.push_back(panel.color);
         match brain.run() {
             VmState::Terminated => break,
             _ => (), // keep going
@@ -370,8 +391,7 @@ fn simulate_robot(program: &Vec<i64>, start_color: i64) -> HashMap<i64, i64> {
         let new_color = brain.output_sink.pop_front().unwrap();
         let turn_dir = brain.output_sink.pop_front().unwrap();
 
-        *panel_map.entry(pos_hash).or_insert(new_color) = new_color;
-        
+        panel.color = new_color;
         let new_dir = match turn_dir {
             0 => match dir {
                 Direction::Up => Direction::Left,
@@ -390,50 +410,52 @@ fn simulate_robot(program: &Vec<i64>, start_color: i64) -> HashMap<i64, i64> {
         dir = new_dir;
         
         match dir {
-            Direction::Up => cur_y += 1,
-            Direction::Down => cur_y -= 1,
-            Direction::Left => cur_x -= 1,
-            Direction::Right => cur_x += 1,
+            Direction::Up => cur.y += 1,
+            Direction::Down => cur.y -= 1,
+            Direction::Left => cur.x -= 1,
+            Direction::Right => cur.x += 1,
         }
     }
-    return panel_map;
+    return panels;
 }
 
 fn main() {
     let program = read_program("../input");
 
-    let panels = simulate_robot(&program, 0);
+    let panels = simulate_robot(&program, 1);
     println!("{} panels painted!", panels.len());
 
-    let mut min_x = 0;
-    let mut max_x = 0;
-    let mut min_y = 0;
-    let mut max_y = 0;
-    for (pos_hash, _color) in panels.iter() {
-        let (x, y) = hash_to_pos(*pos_hash);
-        min_x = std::cmp::min(x, min_x);
-        min_y = std::cmp::min(y, min_y);
-        max_x = std::cmp::max(x, max_x);
-        max_y = std::cmp::max(y, max_y);
+    let mut min = Position { x: 0, y: 0 };
+    let mut max = Position { x: 0, y: 0 };
+    for panel in &panels {
+        min.x = std::cmp::min(panel.position.x, min.x);
+        min.y = std::cmp::min(panel.position.y, min.y);
+        max.x = std::cmp::max(panel.position.x, max.x);
+        max.y = std::cmp::max(panel.position.y, max.y);
     }
-    let range_y = (max_y - min_y + 1) as usize;
-    let range_x = (max_x - min_x + 1) as usize;
-    println!("min_x: {}, range_x: {}", min_x, range_x);
-    println!("min_y: {}, range_y: {}", min_y, range_y);
+    let range = Position {
+        x: max.x - min.x + 1,
+        y: max.y - min.y + 1
+    };
+    println!("min.x: {}, max.x: {} -> range.x: {}", min.x, max.x, range.x);
+    println!("min.y: {}, max.y: {} -> range.y: {}", min.y, max.y, range.y);
     
     let mut ship: Vec<Vec<i64>> = Vec::new();
-    ship.resize(range_y, Vec::new());
-    for y in 0..range_y {
-        ship[y].resize(range_x, 0);
+    ship.resize(range.y as usize, Vec::new());
+    for y in 0..range.y {
+        ship[y as usize].resize(range.x as usize, 0);
     }
 
-    for (pos_hash, color) in panels.iter() {
-        let (x, y) = hash_to_pos(*pos_hash);
-        let rx = (x + min_x) as usize;
-        let ry = (y + min_y) as usize;
-        ship[ry][rx] = *color;
+    println!("Filling grid");
+    for panel in &panels {
+        let rx = (panel.position.x - min.x) as usize;
+        let ry = (panel.position.y - min.y) as usize;
+        ship[ry][rx] = panel.color;
     }
-    for y in 0..ship.len() {
+
+    println!("Output:");
+    for y_ in 0..ship.len() {
+        let y = ship.len() - 1 - y_;
         for x in 0..ship[y].len() {
             print!("{}", match ship[y][x] {
                 0 => " ",
