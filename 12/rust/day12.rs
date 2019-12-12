@@ -73,23 +73,22 @@ impl Body {
     }
 }
 
-fn step(old_state: &Vec<Body>) -> Vec<Body> {
-    let mut state = old_state.clone();
-    for i in 0..state.len() {
-        for j in 0..state.len() {
+type System = Vec<Body>;
+
+fn step(new_state: &mut System, old_state: &System) {
+    for i in 0..new_state.len() {
+        new_state[i].velocity = old_state[i].velocity;
+        for j in 0..new_state.len() {
             if i != j {
                 let rel = old_state[j].position - old_state[i].position;
-                state[i].velocity = state[i].velocity + rel.sign();
+                new_state[i].velocity = new_state[i].velocity + rel.sign();
             }
         }
+        new_state[i].position = old_state[i].position + new_state[i].velocity;
     }
-    for body in &mut state {
-        body.position = body.position + body.velocity
-    }
-    return state;
 }
 
-fn total_energy(system: &Vec<Body>) -> u64 {
+fn total_energy(system: &System) -> u64 {
     let mut e: u64 = 0;
     for body in system {
         e += body.energy();
@@ -98,18 +97,19 @@ fn total_energy(system: &Vec<Body>) -> u64 {
 }
 
 fn main() {
-    let mut moons: Vec<Body> = vec![
+    let mut moons: System = vec![
         Body { position: Vector { x: 15, y: -2, z: -6 }, velocity: Vector::default() },
         Body { position: Vector { x: -5, y: -4, z: -11 }, velocity: Vector::default() },
         Body { position: Vector { x: 0, y: -6, z: 0 }, velocity: Vector::default() },
         Body { position: Vector { x: 5, y: 9, z: 6 }, velocity: Vector::default() },
     ];
-    /*let mut moons: Vec<Body> = vec![
+    /*let mut moons: System = vec![
         Body { position: Vector { x: -1, y: 0, z: 2 }, velocity: Vector::default() },
         Body { position: Vector { x: 2, y: -10, z: -7 }, velocity: Vector::default() },
         Body { position: Vector { x: 4, y: -8, z: 8 }, velocity: Vector::default() },
         Body { position: Vector { x: 3, y: 5, z: -1 }, velocity: Vector::default() },
     ];*/
+    let mut moons_new = moons.clone();
     for _step in 0..1000 {
         /*for moon in &moons {
             println!("pos=<x={}, y={}, z={}>, vel=<x={}, y={}, z={}>", 
@@ -117,8 +117,10 @@ fn main() {
                 moon.velocity.x, moon.velocity.y, moon.velocity.z);
         }
         println!("");*/
-        let new_state = step(&moons);
-        moons = new_state;
+        step(&mut moons_new, &moons);
+        let temp = moons;
+        moons = moons_new;
+        moons_new = temp;
     }
     println!("Total energy: {}", total_energy(&moons));
 }
