@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, AddAssign, Sub};
 
 fn sgn(x: i64) -> i64 {
     if x > 0 {
@@ -10,7 +10,7 @@ fn sgn(x: i64) -> i64 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 struct Vector {
     x: i64,
     y: i64,
@@ -18,40 +18,16 @@ struct Vector {
 }
 
 impl Vector {
-    fn sign(&self) -> Vector {
-        return Vector {
-            x: sgn(self.x),
-            y: sgn(self.y),
-            z: sgn(self.z)
-        }
-    }
-
     fn one_norm(&self) -> u64 {
         return (self.x.abs() + self.y.abs() + self.z.abs()) as u64;
     }
 }
 
-impl Add for Vector {
-    type Output = Vector;
-
-    fn add(self, rhs: Vector) -> Vector {
-        return Vector {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            z: self.z + rhs.z
-        };
-    }
-}
-
-impl Sub for Vector {
-    type Output = Vector;
-    
-    fn sub(self, rhs: Vector) -> Vector {
-        return Vector {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-            z: self.z - rhs.z
-        };
+impl AddAssign for Vector {
+    fn add_assign(&mut self, rhs: Vector) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
     }
 }
 
@@ -75,16 +51,18 @@ impl Body {
 
 type System = Vec<Body>;
 
-fn step(new_state: &mut System, old_state: &System) {
-    for i in 0..new_state.len() {
-        new_state[i].velocity = old_state[i].velocity;
-        for j in 0..new_state.len() {
+fn step(state: &mut System) {
+    for i in 0..state.len() {
+        for j in 0..state.len() {
             if i != j {
-                let rel = old_state[j].position - old_state[i].position;
-                new_state[i].velocity = new_state[i].velocity + rel.sign();
+                state[i].velocity.x += sgn(state[j].position.x - state[i].position.x);
+                state[i].velocity.y += sgn(state[j].position.y - state[i].position.y);
+                state[i].velocity.z += sgn(state[j].position.z - state[i].position.z);
             }
         }
-        new_state[i].position = old_state[i].position + new_state[i].velocity;
+    }
+    for body in state {
+        body.position += body.velocity;
     }
 }
 
@@ -96,31 +74,46 @@ fn total_energy(system: &System) -> u64 {
     return e;
 }
 
+fn state_equal(a: &System, b: &System) -> bool {
+    assert!(a.len() == b.len());
+    for i in 0..a.len() {
+        if a[i].position != b[i].position || a[i].velocity != b[i].velocity {
+            return false;
+        }
+    }
+    return true;
+}
+
 fn main() {
-    let mut moons: System = vec![
+    let start: System = vec![
         Body { position: Vector { x: 15, y: -2, z: -6 }, velocity: Vector::default() },
         Body { position: Vector { x: -5, y: -4, z: -11 }, velocity: Vector::default() },
         Body { position: Vector { x: 0, y: -6, z: 0 }, velocity: Vector::default() },
         Body { position: Vector { x: 5, y: 9, z: 6 }, velocity: Vector::default() },
     ];
-    /*let mut moons: System = vec![
+    /*let start: System = vec![
         Body { position: Vector { x: -1, y: 0, z: 2 }, velocity: Vector::default() },
         Body { position: Vector { x: 2, y: -10, z: -7 }, velocity: Vector::default() },
         Body { position: Vector { x: 4, y: -8, z: 8 }, velocity: Vector::default() },
         Body { position: Vector { x: 3, y: 5, z: -1 }, velocity: Vector::default() },
     ];*/
-    let mut moons_new = moons.clone();
+    let mut moons = start.clone();
     for _step in 0..1000 {
-        /*for moon in &moons {
-            println!("pos=<x={}, y={}, z={}>, vel=<x={}, y={}, z={}>", 
-                moon.position.x, moon.position.y, moon.position.z, 
-                moon.velocity.x, moon.velocity.y, moon.velocity.z);
-        }
-        println!("");*/
-        step(&mut moons_new, &moons);
-        let temp = moons;
-        moons = moons_new;
-        moons_new = temp;
+        step(&mut moons);
     }
     println!("Total energy: {}", total_energy(&moons));
+
+    let mut steps = 0;
+    loop {
+        step(&mut moons);
+        steps += 1;
+        if steps % 10000000 == 0 {
+            println!("{} steps", steps);
+        }
+
+        if state_equal(&moons, &start) {
+            break;
+        }
+    }
+    println!("State back to start after {} steps", steps);
 }
