@@ -1,14 +1,4 @@
-use std::ops::{Add, AddAssign, Sub};
-
-fn sgn(x: i64) -> i64 {
-    if x > 0 {
-        return 1;
-    } else if x < 0 {
-        return -1;
-    } else {
-        return 0;
-    }
-}
+use std::ops::{AddAssign};
 
 #[derive(Clone, Copy, PartialEq)]
 struct Vector {
@@ -20,6 +10,18 @@ struct Vector {
 impl Vector {
     fn one_norm(&self) -> u64 {
         return (self.x.abs() + self.y.abs() + self.z.abs()) as u64;
+    }
+
+    fn get_x(&self) -> i64 {
+        return self.x;
+    }
+
+    fn get_y(&self) -> i64 {
+        return self.y;
+    }
+
+    fn get_z(&self) -> i64 {
+        return self.z;
     }
 }
 
@@ -55,9 +57,9 @@ fn step(state: &mut System) {
     for i in 0..state.len() {
         for j in 0..state.len() {
             if i != j {
-                state[i].velocity.x += sgn(state[j].position.x - state[i].position.x);
-                state[i].velocity.y += sgn(state[j].position.y - state[i].position.y);
-                state[i].velocity.z += sgn(state[j].position.z - state[i].position.z);
+                state[i].velocity.x += (state[j].position.x - state[i].position.x).signum();
+                state[i].velocity.y += (state[j].position.y - state[i].position.y).signum();
+                state[i].velocity.z += (state[j].position.z - state[i].position.z).signum();
             }
         }
     }
@@ -74,10 +76,10 @@ fn total_energy(system: &System) -> u64 {
     return e;
 }
 
-fn state_equal(a: &System, b: &System) -> bool {
+fn state_equal(a: &System, b: &System, comp: fn(&Vector) -> i64) -> bool {
     assert!(a.len() == b.len());
     for i in 0..a.len() {
-        if a[i].position != b[i].position || a[i].velocity != b[i].velocity {
+        if comp(&a[i].position) != comp(&b[i].position) || comp(&a[i].velocity) != comp(&b[i].velocity) {
             return false;
         }
     }
@@ -103,7 +105,8 @@ fn main() {
     }
     println!("Total energy: {}", total_energy(&moons));
 
-    let mut steps = 0;
+    let mut steps: i64 = 0;
+    let mut period: Vector = Vector::default();
     loop {
         step(&mut moons);
         steps += 1;
@@ -111,9 +114,21 @@ fn main() {
             println!("{} steps", steps);
         }
 
-        if state_equal(&moons, &start) {
+        if state_equal(&moons, &start, Vector::get_x) && period.x == 0 {
+            period.x = steps;
+            println!("Period x: {}", period.x);
+        }
+        if state_equal(&moons, &start, Vector::get_y) && period.y == 0 {
+            period.y = steps;
+            println!("Period y: {}", period.y);
+        }
+        if state_equal(&moons, &start, Vector::get_z) && period.z == 0 {
+            period.z = steps;
+            println!("Period z: {}", period.z);
+        }
+        if period.x != 0 && period.y != 0 && period.z != 0 {
             break;
         }
     }
-    println!("State back to start after {} steps", steps);
+    println!("https://www.wolframalpha.com/input/?i=lcm%28{}%2C{}%2C{}%29", period.x, period.y, period.z);
 }
