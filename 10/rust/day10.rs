@@ -1,6 +1,8 @@
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::cmp;
+use std::cmp::Ordering::Equal;
+use std::f64::consts::{PI, FRAC_PI_2};
 
 type BoolGrid = Vec<Vec<bool>>;
 
@@ -81,19 +83,19 @@ fn get_visibility_map(asteroid_map: &BoolGrid, view_x: usize, view_y: usize) -> 
     return vis_map;
 }
 
-fn count_visible_asteroids(asteroid_map: &BoolGrid, vis_map: &BoolGrid) -> usize {
+fn get_visible_asteroids(asteroid_map: &BoolGrid, vis_map: &BoolGrid) -> Vec<(usize, usize)> {
     // I'm sure this can be done in some nice functional way or something
-    let mut count = 0;
+    let mut asteroids: Vec<(usize, usize)> = Vec::new();
     assert!(asteroid_map.len() == vis_map.len());
     for y in 0..asteroid_map.len() {
         assert!(asteroid_map[y].len() == vis_map[y].len());
         for x in 0..asteroid_map[y].len() {
             if asteroid_map[y][x] && vis_map[y][x] {
-                count += 1;
+                asteroids.push((x, y));
             }
         }
     }
-    return count;
+    return asteroids;
 }
 
 fn print_map(map: &BoolGrid, true_str: &str, false_str: &str) {
@@ -108,8 +110,47 @@ fn print_map(map: &BoolGrid, true_str: &str, false_str: &str) {
     }
 }
 
+fn print_asteroids(asteroids: &Vec<(usize, usize)>) {
+    let mut map: BoolGrid = BoolGrid::new();
+    let mut size_x = 0;
+    let mut size_y = 0;
+    for asteroid in asteroids {
+        size_x = cmp::max(size_x, asteroid.0 + 1);
+        size_y = cmp::max(size_y, asteroid.1 + 1);
+    }
+    map.resize(size_y, Vec::new());
+    for y in 0..size_y {
+        map[y].resize(size_x, false);
+    }
+    for asteroid in asteroids {
+        let (x, y) = asteroid;
+        map[*y][*x] = true;
+    }
+    print_map(&map, "#", ".");
+}
+
+fn norm_angle(angle: f64) -> f64 {
+    let mut a = angle;
+    while a > 2.0 * PI {
+        a -= 2.0 * PI;
+    }
+    while a < 0.0 {
+        a += 2.0 * PI;
+    }
+    return a;
+}
+
+fn get_pos_angle(x: usize, y: usize, view_x: usize, view_y: usize) -> f64 {
+    let rel_x = (x as i64 - view_x as i64) as f64;
+    let rel_y = (y as i64 - view_y as i64) as f64;
+    return norm_angle(rel_y.atan2(rel_x) + FRAC_PI_2);
+}
+
 fn main() {
     let map = load_asteroid_map("../input");
+    println!("Asteroid map:");
+    print_map(&map, "#", ".");
+
     let mut max_vis = 0;
     let mut max_vis_x = 0;
     let mut max_vis_y = 0;
@@ -119,18 +160,27 @@ fn main() {
             if map[y][x] { // Asteroid
                 let vis_map = get_visibility_map(&map, x, y);
                 //print_map(&vis_map, " ", "X");
-                let visible_count = count_visible_asteroids(&map, &vis_map) - 1; // -1 for OTHER asteroids
+                let visible_count = get_visible_asteroids(&map, &vis_map).len() - 1; // -1 for OTHER asteroids
                 if visible_count > max_vis {
                     max_vis = visible_count; 
                     max_vis_x = x;
                     max_vis_y = y;
-                    //println!("Asteroid map:");
-                    //print_map(&map, "#", ".");
-                    //println!("Vis map:");
-                    //print_map(&vis_map, " ", "X");
                 }
             }
         }
     }
     println!("Max {} asteroids visible from {}, {}", max_vis, max_vis_x, max_vis_y);
+    
+    let vis_map = get_visibility_map(&map, max_vis_x, max_vis_y);
+    println!("Vis map:");
+    print_map(&vis_map, " ", "X");
+    
+    let mut visible = get_visible_asteroids(&map, &vis_map);
+    println!("Vaporized asteroids:");
+    print_asteroids(&visible);
+    visible.sort_by(|a, b| get_pos_angle(a.0, a.1, max_vis_x, max_vis_y).partial_cmp(&get_pos_angle(b.0, b.1, max_vis_x, max_vis_y)).unwrap_or(Equal));
+    println!("in order: {:?}", visible);
+    println!("1st: {:?}", visible[0]);
+    println!("200th vaporized asteroid: {:?}", visible[199]);
+    println!("201th vaporized asteroid: {:?}", visible[200]);
 }
