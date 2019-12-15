@@ -33,9 +33,8 @@ fn int_normalize(num: i64, denom: i64) -> (i64, i64) {
     }
     let mut new_num = num;
     let mut new_denom = denom;
-    let max_factor = cmp::max(3, min / 2 + 1);
-    for factor in 2..max_factor {
-        if new_num % factor == 0 && new_denom % factor == 0 {
+    for factor in 2..min+1 { // max is dumb and inefficient, but not trivially sufficient
+        while new_num % factor == 0 && new_denom % factor == 0 {
             new_num /= factor;
             new_denom /= factor;
         }
@@ -61,7 +60,6 @@ fn get_visibility_map(asteroid_map: &BoolGrid, view_x: usize, view_y: usize) -> 
                 let rel_x = x as i64 - view_x as i64;
                 let rel_y = y as i64 - view_y as i64;
                 let (dir_x, dir_y) = int_normalize(rel_x, rel_y);
-                //println!("rel: {}, {} => dir: {}, {}", rel_x, rel_y, dir_x, dir_y);
                 assert!(dir_x != 0 || dir_y != 0);
                 let mut cur_x = x;
                 let mut cur_y = y;
@@ -111,20 +109,25 @@ fn print_map(map: &BoolGrid, true_str: &str, false_str: &str) {
 }
 
 fn main() {
-    let map = load_asteroid_map("../input_test5");
+    let map = load_asteroid_map("../input");
     let mut max_vis = 0;
     let mut max_vis_x = 0;
     let mut max_vis_y = 0;
+    let (_x, _y) = int_normalize(-3, 9);
     for y in 0..map.len() {
         for x in 0..map[y].len() {
             if map[y][x] { // Asteroid
                 let vis_map = get_visibility_map(&map, x, y);
                 //print_map(&vis_map, " ", "X");
-                let visible_count = count_visible_asteroids(&map, &vis_map);
+                let visible_count = count_visible_asteroids(&map, &vis_map) - 1; // -1 for OTHER asteroids
                 if visible_count > max_vis {
-                    max_vis = visible_count - 1; // -1 for OTHER asteroids
+                    max_vis = visible_count; 
                     max_vis_x = x;
                     max_vis_y = y;
+                    //println!("Asteroid map:");
+                    //print_map(&map, "#", ".");
+                    //println!("Vis map:");
+                    //print_map(&vis_map, " ", "X");
                 }
             }
         }
