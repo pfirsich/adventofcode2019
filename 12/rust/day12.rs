@@ -41,13 +41,20 @@ impl Default for Vector {
 
 #[derive(Clone)]
 struct Body {
-    position: Vector,
-    velocity: Vector,
+    pos: Vector,
+    vel: Vector,
 }
 
 impl Body {
+    fn new(x: i64, y: i64, z: i64) -> Body {
+        return Body { 
+            pos: Vector { x: x, y: y, z: z },
+            vel: Vector { x: 0, y: 0, z: 0 },
+        };
+    }
+
     fn energy(&self) -> u64 {
-        return self.position.one_norm() * self.velocity.one_norm();
+        return self.pos.one_norm() * self.vel.one_norm();
     }
 }
 
@@ -57,29 +64,21 @@ fn step(state: &mut System) {
     for i in 0..state.len() {
         for j in 0..state.len() {
             if i != j {
-                state[i].velocity.x += (state[j].position.x - state[i].position.x).signum();
-                state[i].velocity.y += (state[j].position.y - state[i].position.y).signum();
-                state[i].velocity.z += (state[j].position.z - state[i].position.z).signum();
+                state[i].vel.x += (state[j].pos.x - state[i].pos.x).signum();
+                state[i].vel.y += (state[j].pos.y - state[i].pos.y).signum();
+                state[i].vel.z += (state[j].pos.z - state[i].pos.z).signum();
             }
         }
     }
     for body in state {
-        body.position += body.velocity;
+        body.pos += body.vel;
     }
-}
-
-fn total_energy(system: &System) -> u64 {
-    let mut e: u64 = 0;
-    for body in system {
-        e += body.energy();
-    }
-    return e;
 }
 
 fn state_equal(a: &System, b: &System, comp: fn(&Vector) -> i64) -> bool {
     assert!(a.len() == b.len());
     for i in 0..a.len() {
-        if comp(&a[i].position) != comp(&b[i].position) || comp(&a[i].velocity) != comp(&b[i].velocity) {
+        if comp(&a[i].pos) != comp(&b[i].pos) || comp(&a[i].vel) != comp(&b[i].vel) {
             return false;
         }
     }
@@ -88,26 +87,28 @@ fn state_equal(a: &System, b: &System, comp: fn(&Vector) -> i64) -> bool {
 
 fn main() {
     let start: System = vec![
-        Body { position: Vector { x: 15, y: -2, z: -6 }, velocity: Vector::default() },
-        Body { position: Vector { x: -5, y: -4, z: -11 }, velocity: Vector::default() },
-        Body { position: Vector { x: 0, y: -6, z: 0 }, velocity: Vector::default() },
-        Body { position: Vector { x: 5, y: 9, z: 6 }, velocity: Vector::default() },
+        Body::new(15, -2, -6),
+        Body::new(-5, -4, -11),
+        Body::new(0, -6, 0),
+        Body::new(5, 9, 6),
     ];
     /*let start: System = vec![
-        Body { position: Vector { x: -1, y: 0, z: 2 }, velocity: Vector::default() },
-        Body { position: Vector { x: 2, y: -10, z: -7 }, velocity: Vector::default() },
-        Body { position: Vector { x: 4, y: -8, z: 8 }, velocity: Vector::default() },
-        Body { position: Vector { x: 3, y: 5, z: -1 }, velocity: Vector::default() },
+        Body::new(-1, 0, 2),
+        Body::new(2, -10, -7),
+        Body::new(4, -8, 8),
+        Body::new(3, 5, -1),
     ];*/
     let mut moons = start.clone();
     for _step in 0..1000 {
         step(&mut moons);
     }
-    println!("Total energy: {}", total_energy(&moons));
+    let total_energy: u64 = moons.iter().map(Body::energy).sum();
+    println!("Total energy: {}", total_energy);
 
     let mut steps: i64 = 0;
     let mut period: Vector = Vector::default();
-    loop {
+    moons = start.clone();
+    while period.x == 0 || period.y == 0 || period.z == 0 {
         step(&mut moons);
         steps += 1;
         if steps % 10000000 == 0 {
@@ -125,9 +126,6 @@ fn main() {
         if state_equal(&moons, &start, Vector::get_z) && period.z == 0 {
             period.z = steps;
             println!("Period z: {}", period.z);
-        }
-        if period.x != 0 && period.y != 0 && period.z != 0 {
-            break;
         }
     }
     println!("https://www.wolframalpha.com/input/?i=lcm%28{}%2C{}%2C{}%29", period.x, period.y, period.z);
